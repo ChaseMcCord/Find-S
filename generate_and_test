@@ -1,0 +1,41 @@
+#!/usr/bin/env python3
+"""
+Generate a small PDF, run extract_s_words.py, and assert S-words are returned.
+Exit non-zero on failure so GitHub Actions fails the job.
+"""
+import sys
+import subprocess
+from fpdf import FPDF
+from pathlib import Path
+
+# Create a sample PDF
+pdf_path = Path("sample.pdf")
+pdf = FPDF()
+pdf.add_page()
+pdf.set_font("Arial", size=12)
+# include a mix of words starting with S and others
+pdf.multi_cell(0, 8, "Sample Sentence. Some other words: Swift solar sierra start.")
+pdf.output(str(pdf_path))
+
+# Run the extractor (case-insensitive, unique)
+proc = subprocess.run([sys.executable, "extract_s_words.py", str(pdf_path), "-i", "-u"],
+                      capture_output=True, text=True)
+
+if proc.returncode != 0:
+    print("Extractor failed:", proc.stderr)
+    sys.exit(proc.returncode)
+
+out_lines = [line.strip() for line in proc.stdout.splitlines() if line.strip()]
+found = {w.lower() for w in out_lines}
+
+expected = {"sample", "sentence", "some", "swift", "solar", "sierra", "start"}
+
+missing = expected - found
+if missing:
+    print("Missing expected S-words:", missing)
+    print("Extractor output:")
+    print(proc.stdout)
+    sys.exit(2)
+
+print("All expected S-words found. Output:")
+print(proc.stdout)
